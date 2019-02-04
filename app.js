@@ -1,23 +1,47 @@
-var express = require("express");
-var app = express ();
-var request = require("request");
+var express    = require("express");
+var app        = express();
+var bodyParser = require("body-parser");
+var mongoose   = require("mongoose");
+var Campground = require("./models/campground");
+var seedDb     = require("./seeds");
+var Comment    = require("./models/comment");
+var User       = require("./models/user");
+var passport   = require("passport");
+var LocalStrategy = require("passport-local");
+var methodOverride = require("method-override");
+
+var commentRoutes = require("./routes/comments"),
+    campgroundRoutes = require("./routes/campgrounds"),
+    indexRoutes = require("./routes/index")
+
+mongoose.connect("mongodb://localhost/yelp_camp");
+app.use(bodyParser.urlencoded({extended: true}));
 app.set("view engine", "ejs");
+app.use(express.static(__dirname + "/public"));
+app.use(methodOverride("_method"));
+// seedDb();
 
-app.get("/", function(req, res) {
-    res.render("search");
+app.use(require("express-session")({
+    secret: "Once again Rusy wins cutest dog!",
+    resave: false,
+    saveUninitialized: false
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+app.use(function(req, res, next){
+    res.locals.currentUser = req.user;
+    next();
 });
 
-app.get("/results", function(req, res){
-    var query = req.query.search;
-    var url = "http://omdbapi.com/?s=" + query + "&apikey=thewdb";
-    request(url, function(error, response, body){
-        if(!error && response.statusCode == 200) {
-            var data = JSON.parse(body)
-            res.render("results", {data: data});
-        }
-    });
-});
+app.use(indexRoutes);
+app.use("/campgrounds", campgroundRoutes);
+app.use("/campgrounds/:id/comments",commentRoutes);
 
 app.listen(process.env.PORT, process.env.IP, function(){
-    console.log("Movie App has started!!!");
+    console.log("The YelpCamp Server has started");
 });
